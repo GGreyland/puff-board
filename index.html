@@ -2,49 +2,91 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Настройки для правильного отображения на смартфонах -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Стена интерактивных записок</title>
     <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500&family=Neucha&family=Pangolin&display=swap" rel="stylesheet">
     <style>
+        * { box-sizing: border-box; }
+
         body, html {
             margin: 0; padding: 0;
             width: 100%; height: 100%;
-            overflow: hidden;
+            overflow: hidden; /* Запрет прокрутки */
             font-family: sans-serif;
             background: url('bg.jpg') center/cover no-repeat #2c1b12;
+            overscroll-behavior: none; /* Убирает эффект резиновой прокрутки на телефонах */
         }
 
         #wall { position: relative; width: 100%; height: 100%; }
 
-        /* Панель управления */
+        /* ЭФФЕКТ МАТОВОГО СТЕКЛА ДЛЯ ПАНЕЛИ НА ВСЮ ШИРИНУ */
         #ui-panel {
-            position: fixed; bottom: 20px; left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.8);
-            padding: 15px; border-radius: 12px;
-            display: flex; gap: 10px; z-index: 1000;
-            border: 1px solid #444; flex-wrap: wrap; justify-content: center;
+            position: fixed; 
+            bottom: 0; 
+            left: 0;
+            width: 100%;
+            /* Полупрозрачный фон */
+            background: rgba(20, 20, 20, 0.55);
+            /* Размытие фона (матовое стекло) */
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            /* Декоративная верхняя граница для объема */
+            border-top: 1px solid rgba(255, 255, 255, 0.15);
+            padding: 15px 20px;
+            /* Отступ снизу для iPhone без кнопки Home */
+            padding-bottom: max(15px, env(safe-area-inset-bottom));
+            display: flex; 
+            gap: 15px; 
+            z-index: 1000;
+            align-items: center; 
+            justify-content: center;
+        }
+
+        .inputs-wrapper {
+            display: flex;
+            gap: 15px;
+            width: 100%;
+            max-width: 800px;
         }
 
         #ui-panel input {
-            padding: 10px; border-radius: 5px; border: none; outline: none;
+            padding: 12px 15px; 
+            border-radius: 8px; 
+            border: 1px solid rgba(255, 255, 255, 0.3); 
+            outline: none;
+            background: rgba(255, 255, 255, 0.85); /* Полупрозрачные поля ввода */
+            transition: background 0.3s;
+            font-size: 16px; /* 16px обязателен для iOS, чтобы не было зума */
         }
 
-        #message { width: 250px; }
-        #author-name { width: 100px; }
+        #ui-panel input:focus { background: rgba(255, 255, 255, 1); }
+        
+        #author-name { flex: 1; min-width: 100px; }
+        #message { flex: 3; }
 
-        #ui-panel button {
-            padding: 10px 20px; background: #d4a373;
-            border: none; border-radius: 5px; color: white;
-            font-weight: bold; cursor: pointer;
+        #send-btn {
+            padding: 12px 25px; 
+            background: #d4a373;
+            border: none; 
+            border-radius: 8px; 
+            color: white;
+            font-weight: bold; 
+            font-size: 16px;
+            cursor: pointer;
+            transition: 0.2s;
+            white-space: nowrap;
         }
 
-        /* Записки */
+        #send-btn:hover { background: #bc8a5f; }
+        #send-btn:active { transform: scale(0.95); }
+
+        /* ЗАПИСКИ */
         .note {
             position: absolute;
             padding: 20px;
-            box-shadow: 5px 5px 15px rgba(0,0,0,0.4);
-            min-width: 120px; max-width: 220px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.5);
+            min-width: 140px; max-width: 240px;
             word-wrap: break-word;
             transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             cursor: default;
@@ -52,35 +94,44 @@
 
         .note:hover { transform: scale(1.1) rotate(0deg) !important; z-index: 999 !important; }
 
-        /* Эффект скотча */
         .note::before {
             content: ''; position: absolute; top: -12px; left: 50%;
             transform: translateX(-50%); width: 50px; height: 20px;
-            background: rgba(255, 255, 255, 0.3); border-radius: 2px;
+            background: rgba(255, 255, 255, 0.35); border-radius: 2px;
         }
 
-        .note-text { font-size: 20px; color: #111; margin-bottom: 10px; }
-        .note-author { font-size: 14px; text-align: right; opacity: 0.7; font-weight: bold; }
+        .note-text { font-size: 22px; color: #111; margin-bottom: 10px; line-height: 1.2; }
+        .note-author { font-size: 15px; text-align: right; opacity: 0.8; font-weight: bold; }
 
-        /* Кнопки управления (только для своих) */
+        /* Кнопки управления записками */
         .controls {
             position: absolute; top: 5px; right: 5px;
             display: none; gap: 5px;
         }
-
         .note.my-note .controls { display: flex; }
-
         .btn-mini {
             background: rgba(0,0,0,0.1); border: none;
-            cursor: pointer; font-size: 12px; padding: 2px 5px;
-            border-radius: 3px; transition: 0.2s;
+            cursor: pointer; font-size: 14px; padding: 3px 6px;
+            border-radius: 4px; transition: 0.2s;
         }
-
         .btn-mini:hover { background: rgba(0,0,0,0.3); }
 
-        @media (max-width: 600px) {
-            #ui-panel { width: 90%; bottom: 10px; }
-            #message { width: 100%; }
+        /* АДАПТАЦИЯ ДЛЯ СМАРТФОНОВ */
+        @media (max-width: 768px) {
+            #ui-panel {
+                flex-direction: column;
+                padding: 15px;
+            }
+            .inputs-wrapper {
+                flex-direction: column; /* Поля друг под другом на телефоне */
+                gap: 10px;
+            }
+            #author-name, #message, #send-btn { width: 100%; }
+            
+            /* Уменьшаем записки для маленьких экранов */
+            .note { min-width: 110px; max-width: 180px; padding: 15px; }
+            .note-text { font-size: 18px; }
+            .note-author { font-size: 13px; }
         }
     </style>
 </head>
@@ -89,8 +140,10 @@
     <div id="wall"></div>
 
     <div id="ui-panel">
-        <input type="text" id="author-name" placeholder="Имя" maxlength="12">
-        <input type="text" id="message" placeholder="Напиши записку..." maxlength="120">
+        <div class="inputs-wrapper">
+            <input type="text" id="author-name" placeholder="Ваше имя" maxlength="15">
+            <input type="text" id="message" placeholder="Напишите послание..." maxlength="120">
+        </div>
         <button id="send-btn">Прикрепить</button>
     </div>
 
@@ -99,7 +152,6 @@
         import { getDatabase, ref, push, onChildAdded, onChildRemoved, onChildChanged, remove, update, get, query, limitToFirst } 
         from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-        // Ваши данные Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyCGSHvTiIWjiNKzEKwtVTiEhJbTu8l8zJg",
             authDomain: "message-board-52a02.firebaseapp.com",
@@ -123,7 +175,6 @@
         const messageInput = document.getElementById('message');
         const sendBtn = document.getElementById('send-btn');
 
-        // Хранилище ID "моих" записок в этом браузере
         let myNotes = JSON.parse(localStorage.getItem('my_notes_ids') || '[]');
 
         function saveNoteToLocal(id) {
@@ -131,14 +182,12 @@
             localStorage.setItem('my_notes_ids', JSON.stringify(myNotes));
         }
 
-        // ОТПРАВКА
         async function sendNote() {
             const text = messageInput.value.trim();
             const name = nameInput.value.trim() || 'Аноним';
 
             if (!text) return;
 
-            // Удаляем старую, если лимит превышен
             const snapshot = await get(notesRef);
             if (snapshot.exists() && Object.keys(snapshot.val()).length >= MAX_NOTES) {
                 const q = query(notesRef, limitToFirst(1));
@@ -146,38 +195,39 @@
                 oldNote.forEach(child => remove(ref(db, `notes/${child.key}`)));
             }
 
+            // Зона появления по высоте (y) теперь до 65%, чтобы записки не падали под панель управления
             const newNote = {
                 name, text,
                 color: colors[Math.floor(Math.random() * colors.length)],
                 font: fonts[Math.floor(Math.random() * fonts.length)],
-                rotation: Math.floor(Math.random() * 20) - 10,
-                x: Math.floor(Math.random() * 75) + 5,
-                y: Math.floor(Math.random() * 65) + 5
+                rotation: Math.floor(Math.random() * 24) - 12, // от -12 до 12 градусов
+                x: Math.floor(Math.random() * 75) + 5, 
+                y: Math.floor(Math.random() * 60) + 5 
             };
 
             const pushedNote = push(notesRef, newNote);
             saveNoteToLocal(pushedNote.key);
             
             messageInput.value = '';
-            renderAllNotes(); // Перерисовываем, чтобы появились кнопки управления
+            // Скрываем клавиатуру на телефоне после отправки
+            messageInput.blur(); 
+            renderAllNotes();
         }
 
-        // УДАЛЕНИЕ
         window.deleteNote = (id) => {
             if (confirm('Удалить эту записку?')) {
                 remove(ref(db, `notes/${id}`));
             }
         };
 
-        // РЕДАКТИРОВАНИЕ
         window.editNote = (id) => {
-            const newText = prompt('Отредактируйте сообщение:');
+            const currentText = document.querySelector(`#note-${id} .note-text`).innerText;
+            const newText = prompt('Отредактируйте сообщение:', currentText);
             if (newText !== null && newText.trim() !== "") {
                 update(ref(db, `notes/${id}`), { text: newText });
             }
         };
 
-        // ОТРИСОВКА ОДНОЙ ЗАПИСКИ
         function createNoteElement(id, data) {
             const isMy = myNotes.includes(id);
             const el = document.createElement('div');
@@ -200,7 +250,6 @@
             return el;
         }
 
-        // СЛУШАТЕЛИ FIREBASE
         onChildAdded(notesRef, (snap) => {
             wall.appendChild(createNoteElement(snap.key, snap.val()));
         });
@@ -217,7 +266,6 @@
         });
 
         function renderAllNotes() {
-            // Перепроверяем классы для кнопок (нужно после создания новой записки)
             myNotes = JSON.parse(localStorage.getItem('my_notes_ids') || '[]');
             document.querySelectorAll('.note').forEach(el => {
                 const id = el.id.replace('note-', '');
