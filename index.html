@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Стена интерактивных записок</title>
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500&family=Neucha&family=Pangolin&display=swap" rel="stylesheet">
+    <style>
+        body, html {
+            margin: 0; padding: 0;
+            width: 100%; height: 100%;
+            overflow: hidden;
+            font-family: sans-serif;
+            background: url('background.jpg') center/cover no-repeat #2c1b12;
+        }
+
+        #wall { position: relative; width: 100%; height: 100%; }
+
+        /* Панель управления */
+        #ui-panel {
+            position: fixed; bottom: 20px; left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px; border-radius: 12px;
+            display: flex; gap: 10px; z-index: 1000;
+            border: 1px solid #444; flex-wrap: wrap; justify-content: center;
+        }
+
+        #ui-panel input {
+            padding: 10px; border-radius: 5px; border: none; outline: none;
+        }
+
+        #message { width: 250px; }
+        #author-name { width: 100px; }
+
+        #ui-panel button {
+            padding: 10px 20px; background: #d4a373;
+            border: none; border-radius: 5px; color: white;
+            font-weight: bold; cursor: pointer;
+        }
+
+        /* Записки */
+        .note {
+            position: absolute;
+            padding: 20px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.4);
+            min-width: 120px; max-width: 220px;
+            word-wrap: break-word;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            cursor: default;
+        }
+
+        .note:hover { transform: scale(1.1) rotate(0deg) !important; z-index: 999 !important; }
+
+        /* Эффект скотча */
+        .note::before {
+            content: ''; position: absolute; top: -12px; left: 50%;
+            transform: translateX(-50%); width: 50px; height: 20px;
+            background: rgba(255, 255, 255, 0.3); border-radius: 2px;
+        }
+
+        .note-text { font-size: 20px; color: #111; margin-bottom: 10px; }
+        .note-author { font-size: 14px; text-align: right; opacity: 0.7; font-weight: bold; }
+
+        /* Кнопки управления (только для своих) */
+        .controls {
+            position: absolute; top: 5px; right: 5px;
+            display: none; gap: 5px;
+        }
+
+        .note.my-note .controls { display: flex; }
+
+        .btn-mini {
+            background: rgba(0,0,0,0.1); border: none;
+            cursor: pointer; font-size: 12px; padding: 2px 5px;
+            border-radius: 3px; transition: 0.2s;
+        }
+
+        .btn-mini:hover { background: rgba(0,0,0,0.3); }
+
+        @media (max-width: 600px) {
+            #ui-panel { width: 90%; bottom: 10px; }
+            #message { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="wall"></div>
+
+    <div id="ui-panel">
+        <input type="text" id="author-name" placeholder="Имя" maxlength="12">
+        <input type="text" id="message" placeholder="Напиши записку..." maxlength="120">
+        <button id="send-btn">Прикрепить</button>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, push, onChildAdded, onChildRemoved, onChildChanged, remove, update, get, query, limitToFirst } 
+        from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        // Ваши данные Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyCGSHvTiIWjiNKzEKwtVTiEhJbTu8l8zJg",
+            authDomain: "message-board-52a02.firebaseapp.com",
+            databaseURL: "https://message-board-52a02-default-rtdb.firebaseio.com",
+            projectId: "message-board-52a02",
+            storageBucket: "message-board-52a02.firebasestorage.app",
+            messagingSenderId: "832258965698",
+            appId: "1:832258965698:web:dada1ee0cec140f4d9fb5b"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const notesRef = ref(db, 'notes');
+
+        const colors = ['#fdfd96', '#ffb7b2', '#c1e1c1', '#b5ead7', '#e2f0cb', '#e7c6ff'];
+        const fonts = ['"Caveat"', '"Neucha"', '"Pangolin"'];
+        const MAX_NOTES = 40;
+
+        const wall = document.getElementById('wall');
+        const nameInput = document.getElementById('author-name');
+        const messageInput = document.getElementById('message');
+        const sendBtn = document.getElementById('send-btn');
+
+        // Хранилище ID "моих" записок в этом браузере
+        let myNotes = JSON.parse(localStorage.getItem('my_notes_ids') || '[]');
+
+        function saveNoteToLocal(id) {
+            myNotes.push(id);
+            localStorage.setItem('my_notes_ids', JSON.stringify(myNotes));
+        }
+
+        // ОТПРАВКА
+        async function sendNote() {
+            const text = messageInput.value.trim();
+            const name = nameInput.value.trim() || 'Аноним';
+
+            if (!text) return;
+
+            // Удаляем старую, если лимит превышен
+            const snapshot = await get(notesRef);
+            if (snapshot.exists() && Object.keys(snapshot.val()).length >= MAX_NOTES) {
+                const q = query(notesRef, limitToFirst(1));
+                const oldNote = await get(q);
+                oldNote.forEach(child => remove(ref(db, `notes/${child.key}`)));
+            }
+
+            const newNote = {
+                name, text,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                font: fonts[Math.floor(Math.random() * fonts.length)],
+                rotation: Math.floor(Math.random() * 20) - 10,
+                x: Math.floor(Math.random() * 75) + 5,
+                y: Math.floor(Math.random() * 65) + 5
+            };
+
+            const pushedNote = push(notesRef, newNote);
+            saveNoteToLocal(pushedNote.key);
+            
+            messageInput.value = '';
+            renderAllNotes(); // Перерисовываем, чтобы появились кнопки управления
+        }
+
+        // УДАЛЕНИЕ
+        window.deleteNote = (id) => {
+            if (confirm('Удалить эту записку?')) {
+                remove(ref(db, `notes/${id}`));
+            }
+        };
+
+        // РЕДАКТИРОВАНИЕ
+        window.editNote = (id) => {
+            const newText = prompt('Отредактируйте сообщение:');
+            if (newText !== null && newText.trim() !== "") {
+                update(ref(db, `notes/${id}`), { text: newText });
+            }
+        };
+
+        // ОТРИСОВКА ОДНОЙ ЗАПИСКИ
+        function createNoteElement(id, data) {
+            const isMy = myNotes.includes(id);
+            const el = document.createElement('div');
+            el.id = `note-${id}`;
+            el.className = `note ${isMy ? 'my-note' : ''}`;
+            el.style.left = data.x + '%';
+            el.style.top = data.y + '%';
+            el.style.backgroundColor = data.color;
+            el.style.fontFamily = data.font;
+            el.style.transform = `rotate(${data.rotation}deg)`;
+
+            el.innerHTML = `
+                <div class="controls">
+                    <button class="btn-mini" onclick="editNote('${id}')">✎</button>
+                    <button class="btn-mini" onclick="deleteNote('${id}')">✕</button>
+                </div>
+                <div class="note-text">${data.text}</div>
+                <div class="note-author">— ${data.name}</div>
+            `;
+            return el;
+        }
+
+        // СЛУШАТЕЛИ FIREBASE
+        onChildAdded(notesRef, (snap) => {
+            wall.appendChild(createNoteElement(snap.key, snap.val()));
+        });
+
+        onChildRemoved(notesRef, (snap) => {
+            document.getElementById(`note-${snap.key}`)?.remove();
+        });
+
+        onChildChanged(notesRef, (snap) => {
+            const noteEl = document.getElementById(`note-${snap.key}`);
+            if (noteEl) {
+                noteEl.querySelector('.note-text').innerText = snap.val().text;
+            }
+        });
+
+        function renderAllNotes() {
+            // Перепроверяем классы для кнопок (нужно после создания новой записки)
+            myNotes = JSON.parse(localStorage.getItem('my_notes_ids') || '[]');
+            document.querySelectorAll('.note').forEach(el => {
+                const id = el.id.replace('note-', '');
+                if (myNotes.includes(id)) el.classList.add('my-note');
+            });
+        }
+
+        sendBtn.onclick = sendNote;
+        messageInput.onkeypress = (e) => { if(e.key === 'Enter') sendNote(); };
+    </script>
+</body>
+</html>
