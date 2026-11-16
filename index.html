@@ -2,91 +2,94 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <!-- Настройки для правильного отображения на смартфонах -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Стена интерактивных записок</title>
-    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500&family=Neucha&family=Pangolin&display=swap" rel="stylesheet">
+    
+    <!-- Подключаем новые шрифты -->
+    <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600&family=Montserrat:wght@500&family=Playfair+Display:ital,wght@1,500&family=Satisfy&display=swap" rel="stylesheet">
+    
     <style>
         * { box-sizing: border-box; }
 
         body, html {
             margin: 0; padding: 0;
             width: 100%; height: 100%;
-            overflow: hidden; /* Запрет прокрутки */
-            font-family: sans-serif;
-            background: url('Fall 1.jpg') center/cover no-repeat #2c1b12;
-            overscroll-behavior: none; /* Убирает эффект резиновой прокрутки на телефонах */
+            overflow: hidden;
+            background: url('bg.jpg') center/cover no-repeat #2c1b12;
+            overscroll-behavior: none;
         }
 
         #wall { position: relative; width: 100%; height: 100%; }
 
-        /* ЭФФЕКТ МАТОВОГО СТЕКЛА ДЛЯ ПАНЕЛИ НА ВСЮ ШИРИНУ */
+        /* ЭФФЕКТ МАТОВОГО СТЕКЛА ДЛЯ ПАНЕЛИ */
         #ui-panel {
             position: fixed; 
             bottom: 0; 
             left: 0;
             width: 100%;
-            /* Полупрозрачный фон */
-            background: rgba(20, 20, 20, 0.55);
-            /* Размытие фона (матовое стекло) */
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            /* Декоративная верхняя граница для объема */
-            border-top: 1px solid rgba(255, 255, 255, 0.15);
-            padding: 15px 20px;
-            /* Отступ снизу для iPhone без кнопки Home */
-            padding-bottom: max(15px, env(safe-area-inset-bottom));
+            background: rgba(15, 15, 15, 0.45); /* Полупрозрачный фон */
+            backdrop-filter: blur(15px); /* Размытие фона */
+            -webkit-backdrop-filter: blur(15px); /* Для Safari */
+            border-top: 1px solid rgba(255, 255, 255, 0.1); /* Легкий блик сверху */
+            padding: 20px 30px;
+            padding-bottom: max(20px, env(safe-area-inset-bottom));
             display: flex; 
             gap: 15px; 
             z-index: 1000;
             align-items: center; 
-            justify-content: center;
-        }
-
-        .inputs-wrapper {
-            display: flex;
-            gap: 15px;
-            width: 100%;
-            max-width: 800px;
         }
 
         #ui-panel input {
-            padding: 12px 15px; 
-            border-radius: 8px; 
-            border: 1px solid rgba(255, 255, 255, 0.3); 
+            padding: 15px 20px; 
+            border-radius: 10px; 
+            border: 1px solid rgba(255, 255, 255, 0.2); 
             outline: none;
-            background: rgba(255, 255, 255, 0.85); /* Полупрозрачные поля ввода */
-            transition: background 0.3s;
-            font-size: 16px; /* 16px обязателен для iOS, чтобы не было зума */
+            background: rgba(255, 255, 255, 0.75);
+            transition: background 0.3s, box-shadow 0.3s;
+            font-size: 16px; 
+            font-family: 'Montserrat', sans-serif;
         }
 
-        #ui-panel input:focus { background: rgba(255, 255, 255, 1); }
+        #ui-panel input:focus { 
+            background: rgba(255, 255, 255, 0.95); 
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+        }
         
-        #author-name { flex: 1; min-width: 100px; }
-        #message { flex: 3; }
+        /* Распределение ширины */
+        #author-name { 
+            width: 150px; 
+            flex-shrink: 0; /* Запрещаем сужаться */
+        }
+        
+        #message { 
+            flex-grow: 1; /* ПОЛЕ НА ВСЮ ОСТАВШУЮСЯ ШИРИНУ */
+        }
 
         #send-btn {
-            padding: 12px 25px; 
+            padding: 15px 30px; 
             background: #d4a373;
             border: none; 
-            border-radius: 8px; 
+            border-radius: 10px; 
             color: white;
+            font-family: 'Montserrat', sans-serif;
             font-weight: bold; 
             font-size: 16px;
             cursor: pointer;
             transition: 0.2s;
             white-space: nowrap;
+            flex-shrink: 0;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
 
-        #send-btn:hover { background: #bc8a5f; }
-        #send-btn:active { transform: scale(0.95); }
+        #send-btn:hover { background: #bc8a5f; transform: translateY(-2px); }
+        #send-btn:active { transform: translateY(0) scale(0.98); }
 
         /* ЗАПИСКИ */
         .note {
             position: absolute;
-            padding: 20px;
-            box-shadow: 5px 5px 15px rgba(0,0,0,0.5);
-            min-width: 140px; max-width: 240px;
+            padding: 25px 20px 20px 20px;
+            box-shadow: 4px 6px 15px rgba(0,0,0,0.4);
+            min-width: 150px; max-width: 260px;
             word-wrap: break-word;
             transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             cursor: default;
@@ -96,14 +99,15 @@
 
         .note::before {
             content: ''; position: absolute; top: -12px; left: 50%;
-            transform: translateX(-50%); width: 50px; height: 20px;
-            background: rgba(255, 255, 255, 0.35); border-radius: 2px;
+            transform: translateX(-50%); width: 60px; height: 25px;
+            background: rgba(255, 255, 255, 0.4); border-radius: 2px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
 
-        .note-text { font-size: 22px; color: #111; margin-bottom: 10px; line-height: 1.2; }
-        .note-author { font-size: 15px; text-align: right; opacity: 0.8; font-weight: bold; }
+        .note-text { font-size: 21px; color: #111; margin-bottom: 12px; line-height: 1.3; }
+        .note-author { font-size: 14px; text-align: right; opacity: 0.8; font-weight: bold; font-family: 'Montserrat', sans-serif; }
 
-        /* Кнопки управления записками */
+        /* Кнопки управления (ваши записки) */
         .controls {
             position: absolute; top: 5px; right: 5px;
             display: none; gap: 5px;
@@ -111,7 +115,7 @@
         .note.my-note .controls { display: flex; }
         .btn-mini {
             background: rgba(0,0,0,0.1); border: none;
-            cursor: pointer; font-size: 14px; padding: 3px 6px;
+            cursor: pointer; font-size: 14px; padding: 4px 8px;
             border-radius: 4px; transition: 0.2s;
         }
         .btn-mini:hover { background: rgba(0,0,0,0.3); }
@@ -119,19 +123,14 @@
         /* АДАПТАЦИЯ ДЛЯ СМАРТФОНОВ */
         @media (max-width: 768px) {
             #ui-panel {
-                flex-direction: column;
+                flex-direction: column; /* Элементы друг под другом */
                 padding: 15px;
             }
-            .inputs-wrapper {
-                flex-direction: column; /* Поля друг под другом на телефоне */
-                gap: 10px;
+            #author-name, #message, #send-btn { 
+                width: 100%; /* На 100% ширины телефона */
             }
-            #author-name, #message, #send-btn { width: 100%; }
-            
-            /* Уменьшаем записки для маленьких экранов */
-            .note { min-width: 110px; max-width: 180px; padding: 15px; }
+            .note { min-width: 120px; max-width: 180px; padding: 20px 15px 15px 15px; }
             .note-text { font-size: 18px; }
-            .note-author { font-size: 13px; }
         }
     </style>
 </head>
@@ -140,10 +139,8 @@
     <div id="wall"></div>
 
     <div id="ui-panel">
-        <div class="inputs-wrapper">
-            <input type="text" id="author-name" placeholder="Ваше имя" maxlength="15">
-            <input type="text" id="message" placeholder="Напишите послание..." maxlength="120">
-        </div>
+        <input type="text" id="author-name" placeholder="Ваше имя" maxlength="15">
+        <input type="text" id="message" placeholder="Напишите сообщение..." maxlength="120">
         <button id="send-btn">Прикрепить</button>
     </div>
 
@@ -166,8 +163,16 @@
         const db = getDatabase(app);
         const notesRef = ref(db, 'notes');
 
-        const colors = ['#fdfd96', '#ffb7b2', '#c1e1c1', '#b5ead7', '#e2f0cb', '#e7c6ff'];
-        const fonts = ['"Caveat"', '"Neucha"', '"Pangolin"'];
+        // Цвета бумаги
+        const colors = ['#fdfd96', '#ffb7b2', '#c1e1c1', '#b5ead7', '#e2f0cb', '#e7c6ff', '#ffdac1'];
+        // Новые шрифты
+        const fonts = [
+            '"Montserrat", sans-serif', 
+            '"Playfair Display", serif', 
+            '"Dancing Script", cursive', 
+            '"Satisfy", cursive'
+        ];
+        
         const MAX_NOTES = 40;
 
         const wall = document.getElementById('wall');
@@ -195,12 +200,11 @@
                 oldNote.forEach(child => remove(ref(db, `notes/${child.key}`)));
             }
 
-            // Зона появления по высоте (y) теперь до 65%, чтобы записки не падали под панель управления
             const newNote = {
                 name, text,
                 color: colors[Math.floor(Math.random() * colors.length)],
                 font: fonts[Math.floor(Math.random() * fonts.length)],
-                rotation: Math.floor(Math.random() * 24) - 12, // от -12 до 12 градусов
+                rotation: Math.floor(Math.random() * 24) - 12,
                 x: Math.floor(Math.random() * 75) + 5, 
                 y: Math.floor(Math.random() * 60) + 5 
             };
@@ -209,7 +213,6 @@
             saveNoteToLocal(pushedNote.key);
             
             messageInput.value = '';
-            // Скрываем клавиатуру на телефоне после отправки
             messageInput.blur(); 
             renderAllNotes();
         }
