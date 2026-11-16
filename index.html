@@ -13,25 +13,25 @@
         body, html {
             margin: 0; padding: 0;
             width: 100%; 
-            min-height: 100%; /* Позволяем странице расти */
-            /* Убрали overflow: hidden для включения скролла */
+            min-height: 100%; 
             background: url('puff.jpg') center/cover no-repeat #2c1b12;
-            background-attachment: fixed; /* Кирпичи на фоне не двигаются при скролле */
+            background-attachment: fixed; 
         }
 
-        /* КОНТЕЙНЕР ДЛЯ ЗАПИСОК */
+        /* СЕТКА ЗАПИСОК (Flexbox не дает им перекрывать друг друга) */
         #wall { 
             width: 100%; 
             min-height: 100vh;
-            padding: 40px 20px 150px 20px; /* Отступ снизу, чтобы панель не перекрывала записки */
+            padding: 40px 30px 150px 30px; 
             display: flex;
-            flex-wrap: wrap; /* Записки переносятся на новую строку */
-            justify-content: center; /* Центрируем по горизонтали */
-            align-content: flex-start; /* Выравниваем по верхнему краю */
-            gap: 30px; /* Расстояние между записками */
+            flex-wrap: wrap; 
+            justify-content: center; 
+            align-content: flex-start; 
+            /* Базовое расстояние между записками. Наложение будет за счет трансформации */
+            gap: 25px; 
         }
 
-        /* ЭФФЕКТ МАТОВОГО СТЕКЛА */
+        /* ЭФФЕКТ МАТОВОГО СТЕКЛА ДЛЯ ПАНЕЛИ */
         #ui-panel {
             position: fixed; 
             bottom: 0; 
@@ -50,7 +50,6 @@
             transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        /* Кнопка сворачивания панели (скрыта на ПК) */
         #toggle-panel-btn {
             display: none;
             position: absolute;
@@ -103,8 +102,6 @@
             font-size: 16px;
             cursor: pointer;
             transition: 0.2s;
-            white-space: nowrap;
-            flex-shrink: 0;
             box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
 
@@ -113,18 +110,23 @@
 
         /* ЗАПИСКИ */
         .note {
-            position: relative; /* Убрали absolute, теперь они в потоке */
+            position: relative; 
             padding: 25px 20px 20px 20px;
-            box-shadow: 4px 6px 15px rgba(0,0,0,0.4);
-            min-width: 150px; max-width: 260px;
+            box-shadow: 3px 5px 15px rgba(0,0,0,0.4);
+            min-width: 150px; max-width: 250px;
             word-wrap: break-word;
-            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            /* Плавное возвращение при снятии наведения */
+            transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
             cursor: default;
-            /* Чтобы записки не растягивались на всю высоту строки */
             align-self: flex-start; 
         }
 
-        .note:hover { transform: scale(1.1) rotate(0deg) !important; z-index: 100 !important; }
+        /* При наведении записка выравнивается, увеличивается и выходит на передний план */
+        .note:hover { 
+            transform: translate(0, 0) scale(1.1) rotate(0deg) !important; 
+            z-index: 100 !important; 
+            box-shadow: 8px 12px 25px rgba(0,0,0,0.6);
+        }
 
         .note::before {
             content: ''; position: absolute; top: -12px; left: 50%;
@@ -133,7 +135,7 @@
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
 
-        .note-text { font-size: 21px; color: #111; margin-bottom: 12px; line-height: 1.3; }
+        .note-text { font-size: 20px; color: #111; margin-bottom: 15px; line-height: 1.3; }
         .note-author { font-size: 14px; text-align: right; opacity: 0.8; font-weight: bold; font-family: 'Montserrat', sans-serif; }
 
         .controls {
@@ -154,18 +156,13 @@
                 flex-direction: column; 
                 padding: 20px 15px;
             }
-            #toggle-panel-btn {
-                display: block; /* Показываем кнопку сворачивания */
-            }
-            /* Класс для скрытия панели */
-            #ui-panel.collapsed {
-                transform: translateY(100%);
-            }
-            #author-name, #message, #send-btn { 
-                width: 100%; 
-            }
-            #wall { gap: 20px; padding: 20px 10px 150px 10px; }
-            .note { min-width: 130px; max-width: 190px; padding: 20px 15px 15px 15px; }
+            #toggle-panel-btn { display: block; }
+            #ui-panel.collapsed { transform: translateY(100%); }
+            #author-name, #message, #send-btn { width: 100%; }
+            
+            /* На мобильных немного уменьшаем базовый отступ, чтобы уголки лучше цеплялись */
+            #wall { gap: 15px; padding: 20px 15px 150px 15px; }
+            .note { min-width: 140px; max-width: 200px; padding: 20px 15px 15px 15px; }
             .note-text { font-size: 18px; }
         }
     </style>
@@ -208,7 +205,7 @@
             '"Satisfy", cursive'
         ];
         
-        const MAX_NOTES = 100; // Увеличил лимит, так как теперь есть скролл
+        const MAX_NOTES = 100; 
 
         const wall = document.getElementById('wall');
         const nameInput = document.getElementById('author-name');
@@ -217,17 +214,11 @@
         const uiPanel = document.getElementById('ui-panel');
         const toggleBtn = document.getElementById('toggle-panel-btn');
 
-        // Логика сворачивания панели
         toggleBtn.addEventListener('click', () => {
             uiPanel.classList.toggle('collapsed');
-            if (uiPanel.classList.contains('collapsed')) {
-                toggleBtn.innerText = '▲'; // Если свернуто, стрелка вверх
-            } else {
-                toggleBtn.innerText = '▼'; // Если развернуто, стрелка вниз
-            }
+            toggleBtn.innerText = uiPanel.classList.contains('collapsed') ? '▲' : '▼';
         });
 
-        // Если начать печатать, панель автоматически разворачивается (если была свернута)
         messageInput.addEventListener('focus', () => {
             uiPanel.classList.remove('collapsed');
             toggleBtn.innerText = '▼';
@@ -253,12 +244,14 @@
                 oldNote.forEach(child => remove(ref(db, `notes/${child.key}`)));
             }
 
-            // Координаты X и Y больше не нужны, так как работает Flexbox-сетка
+            // Генерируем случайный наклон и случайное легкое смещение по осям X и Y
             const newNote = {
                 name, text,
                 color: colors[Math.floor(Math.random() * colors.length)],
                 font: fonts[Math.floor(Math.random() * fonts.length)],
-                rotation: Math.floor(Math.random() * 20) - 10 // Небольшой наклон от -10 до 10 град.
+                rotation: Math.floor(Math.random() * 16) - 8, // Наклон от -8 до 8 градусов
+                offsetX: Math.floor(Math.random() * 20) - 10, // Сдвиг по X от -10 до 10 px
+                offsetY: Math.floor(Math.random() * 20) - 10  // Сдвиг по Y от -10 до 10 px
             };
 
             const pushedNote = push(notesRef, newNote);
@@ -267,7 +260,6 @@
             messageInput.value = '';
             messageInput.blur(); 
             
-            // Если на мобилке, сворачиваем панель после отправки, чтобы увидеть результат
             if (window.innerWidth <= 768) {
                 uiPanel.classList.add('collapsed');
                 toggleBtn.innerText = '▲';
@@ -297,7 +289,14 @@
             el.className = `note ${isMy ? 'my-note' : ''}`;
             el.style.backgroundColor = data.color;
             el.style.fontFamily = data.font;
-            el.style.transform = `rotate(${data.rotation || 0}deg)`; // Наклон остался для эффекта бумаги
+            
+            // Защита от старых записок, у которых нет параметров offsetX и offsetY
+            const rX = data.offsetX || 0;
+            const rY = data.offsetY || 0;
+            const rot = data.rotation || 0;
+            
+            // Применяем смещение и наклон
+            el.style.transform = `translate(${rX}px, ${rY}px) rotate(${rot}deg)`; 
 
             el.innerHTML = `
                 <div class="controls">
@@ -310,7 +309,6 @@
             return el;
         }
 
-        // prepend добавляет новые записки в НАЧАЛО (наверх) списка
         onChildAdded(notesRef, (snap) => {
             wall.prepend(createNoteElement(snap.key, snap.val()));
         });
